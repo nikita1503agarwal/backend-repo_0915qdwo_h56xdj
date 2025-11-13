@@ -11,10 +11,11 @@ Model name is converted to lowercase for the collection name:
 - BlogPost -> "blogs" collection
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from typing import Optional
+from datetime import date
 
-# Example schemas (replace with your own):
+# Example schemas (you can keep or remove later)
 
 class User(BaseModel):
     """
@@ -22,7 +23,7 @@ class User(BaseModel):
     Collection name: "user" (lowercase of class name)
     """
     name: str = Field(..., description="Full name")
-    email: str = Field(..., description="Email address")
+    email: EmailStr = Field(..., description="Email address")
     address: str = Field(..., description="Address")
     age: Optional[int] = Field(None, ge=0, le=120, description="Age in years")
     is_active: bool = Field(True, description="Whether user is active")
@@ -38,8 +39,36 @@ class Product(BaseModel):
     category: str = Field(..., description="Product category")
     in_stock: bool = Field(True, description="Whether product is in stock")
 
-# Add your own schemas here:
-# --------------------------------------------------
+# Cafe-specific schemas
+
+class MenuItem(BaseModel):
+    """
+    Cafe menu items
+    Collection name: "menuitem"
+    """
+    name: str = Field(..., description="Item name")
+    description: Optional[str] = Field(None, description="Short description")
+    price: float = Field(..., ge=0, description="Price")
+    category: str = Field(..., description="Category such as Coffee, Tea, Pastry")
+    image_url: Optional[str] = Field(None, description="Image URL")
+    is_featured: bool = Field(False, description="Show as featured")
+
+class Reservation(BaseModel):
+    """
+    Cafe reservations
+    Collection name: "reservation"
+    Use aliases so the API accepts {"date": ..., "time": ...} from the frontend
+    while avoiding name clashes with Python's datetime.date type.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: str = Field(..., description="Guest name")
+    email: EmailStr = Field(..., description="Guest email")
+    phone: str = Field(..., description="Contact number")
+    reservation_date: date = Field(..., alias="date", description="Reservation date")
+    reservation_time: str = Field(..., alias="time", description="Time, e.g., 18:30")
+    guests: int = Field(..., ge=1, le=20, description="Number of guests")
+    message: Optional[str] = Field(None, description="Additional notes")
 
 # Note: The Flames database viewer will automatically:
 # 1. Read these schemas from GET /schema endpoint

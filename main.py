@@ -1,8 +1,11 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from typing import List
+from database import create_document, get_documents
+from schemas import MenuItem, Reservation
 
-app = FastAPI()
+app = FastAPI(title="Cafe API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -14,11 +17,45 @@ app.add_middleware(
 
 @app.get("/")
 def read_root():
-    return {"message": "Hello from FastAPI Backend!"}
+    return {"message": "Cafe API is running"}
 
 @app.get("/api/hello")
 def hello():
-    return {"message": "Hello from the backend API!"}
+    return {"message": "Welcome to our cafe!"}
+
+# Public endpoints
+@app.get("/api/menu", response_model=List[MenuItem])
+def list_menu():
+    try:
+        docs = get_documents("menuitem")
+        # Convert ObjectId and datetime to strings if present
+        for d in docs:
+            d["id"] = str(d.get("_id"))
+            d.pop("_id", None)
+            if "created_at" in d:
+                d["created_at"] = str(d["created_at"])  # not in schema but safe
+            if "updated_at" in d:
+                d["updated_at"] = str(d["updated_at"])  # not in schema but safe
+        # Coerce to schema shape
+        return [MenuItem(**{k: v for k, v in d.items() if k in MenuItem.model_fields}) for d in docs]
+    except Exception as e:
+        # If DB not available, return a curated sample menu
+        sample = [
+            MenuItem(name="Iced Latte", description="Espresso with cold milk and ice", price=3.5, category="Coffee", image_url=None, is_featured=True),
+            MenuItem(name="Matcha Latte", description="Ceremonial grade matcha with milk", price=4.0, category="Tea", image_url=None, is_featured=True),
+            MenuItem(name="Butter Croissant", description="Flaky, baked fresh daily", price=2.2, category="Pastry", image_url=None, is_featured=False),
+            MenuItem(name="Mocha", description="Chocolate and espresso harmony", price=3.8, category="Coffee", image_url=None, is_featured=False),
+        ]
+        return sample
+
+@app.post("/api/reservations")
+def create_reservation(res: Reservation):
+    try:
+        doc_id = create_document("reservation", res)
+        return {"status": "ok", "id": doc_id}
+    except Exception as e:
+        # Fallback: accept but mark as not persisted
+        return {"status": "accepted", "id": None}
 
 @app.get("/test")
 def test_database():
